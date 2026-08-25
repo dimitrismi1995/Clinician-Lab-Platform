@@ -217,7 +217,11 @@ router.post("/cases/:caseId/analysis", async (req, res): Promise<void> => {
       rationale: `Selected for adaptable edge blending and ${caseRecord.retentionMethod.toLowerCase()} compatibility. Confirm against manufacturer instructions for use.`,
     },
     fittingGuidance: body.data.waxPatternPhotoCount
-      ? ["Compare marginal seal in relaxed and expressive positions.", "Reduce superior edge thickness before colour verification."]
+      ? [
+          "Compare marginal seal in relaxed and expressive positions against the mirrored reference guide.",
+          "Reduce superior edge thickness before colour verification.",
+          "For colour correction, review the neutral daylight formulation first; reduce warmth only after confirming the reference capture lighting.",
+        ]
       : ["Upload wax pattern images to compare edge contours and positioning against the reference target."],
     longevity: {
       estimatedMonths: months,

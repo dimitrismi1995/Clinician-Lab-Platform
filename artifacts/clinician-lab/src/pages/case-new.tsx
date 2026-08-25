@@ -18,6 +18,8 @@ const caseSchema = z.object({
   patientAge: z.coerce.number().min(0).max(120),
   sex: z.string().min(1, "Sex is required"),
   anatomicalSite: z.string().min(1, "Anatomical site is required"),
+  missingBodyPart: z.string().min(1, "Missing body part is required"),
+  race: z.string().min(1, "Race / ancestry context is required"),
   retentionMethod: z.string().min(1, "Retention method is required"),
   priorTreatments: z.string().optional(),
   ethnicityContext: z.string().optional(),
@@ -36,6 +38,8 @@ export default function CaseNew() {
       patientAge: 0,
       sex: "",
       anatomicalSite: "",
+      missingBodyPart: "",
+      race: "",
       retentionMethod: "",
       priorTreatments: "",
       ethnicityContext: "",
@@ -166,6 +170,36 @@ export default function CaseNew() {
                             <SelectItem value="digital">Digital (Finger/Toe)</SelectItem>
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="missingBodyPart"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Missing Body Part / Defect</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Left external ear" {...field} />
+                        </FormControl>
+                        <FormDescription>Use a descriptive, case-specific label.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="race"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Race / Ancestry Context</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Patient-reported or not recorded" {...field} />
+                        </FormControl>
+                        <FormDescription>Optional context for clinician-led colour matching.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
