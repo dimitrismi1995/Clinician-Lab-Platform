@@ -1,22 +1,24 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Decision-support API for the Clinician Lab Platform.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: cases
+    description: Clinical case planning and review
+  - name: preferences
+    description: Clinician account defaults
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +26,283 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /cases:
+    get:
+      operationId: listCases
+      tags: [cases]
+      summary: List active clinical cases
+      responses:
+        "200":
+          description: Active cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Case"
+    post:
+      operationId: createCase
+      tags: [cases]
+      summary: Create a structured case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseInput"
+      responses:
+        "201":
+          description: Created case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+  /cases/{caseId}:
+    get:
+      operationId: getCase
+      tags: [cases]
+      summary: Get a clinical case
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateCase
+      tags: [cases]
+      summary: Update case workflow state
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseUpdate"
+      responses:
+        "200":
+          description: Updated case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Case"
+  /cases/{caseId}/analysis:
+    post:
+      operationId: analyzeCase
+      tags: [cases]
+      summary: Generate decision-support guidance for a case
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "200":
+          description: Case analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseAnalysis"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [cases]
+      summary: Get case portfolio summary
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /preferences:
+    get:
+      operationId: getPreferences
+      tags: [preferences]
+      summary: Get clinician decision-support presets
+      responses:
+        "200":
+          description: Preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicianPreferences"
+    put:
+      operationId: updatePreferences
+      tags: [preferences]
+      summary: Update clinician presets within manufacturer guardrails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreferencesInput"
+      responses:
+        "200":
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicianPreferences"
 components:
+  parameters:
+    CaseId:
+      name: caseId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
-
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    Case:
+      type: object
+      required: [id, label, patientAge, sex, anatomicalSite, missingBodyPart, race, retentionMethod, status, updatedAt]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        patientAge: { type: number, multipleOf: 1 }
+        sex: { type: string }
+        anatomicalSite: { type: string }
+        missingBodyPart: { type: string }
+        race: { type: string }
+        retentionMethod: { type: string }
+        priorTreatments: { type: array, items: { type: string } }
+        ethnicityContext: { type: ["string", "null"] }
+        status: { type: string, enum: [intake, planning, fitting, review] }
+        updatedAt: { type: string, format: date-time }
+        reviewDate: { type: ["string", "null"], format: date }
+    CaseInput:
+      type: object
+      required: [label, patientAge, sex, anatomicalSite, missingBodyPart, race, retentionMethod]
+      properties:
+        label: { type: string, minLength: 1 }
+        patientAge: { type: number, multipleOf: 1, minimum: 0, maximum: 120 }
+        sex: { type: string }
+        anatomicalSite: { type: string }
+        missingBodyPart: { type: string }
+        race: { type: string }
+        retentionMethod: { type: string }
+        priorTreatments: { type: array, items: { type: string }, default: [] }
+        ethnicityContext: { type: string }
+    CaseUpdate:
+      type: object
+      properties:
+        label: { type: string, minLength: 1 }
+        status: { type: string, enum: [intake, planning, fitting, review] }
+        reviewDate: { type: ["string", "null"], format: date }
+    AnalysisInput:
+      type: object
+      required: [uvExposure, lifestyleDemand, region]
+      properties:
+        uvExposure: { type: string, enum: [low, moderate, high] }
+        lifestyleDemand: { type: string, enum: [low, moderate, high] }
+        region: { type: string }
+        referencePhotoCount: { type: number, multipleOf: 1, minimum: 0 }
+        waxPatternPhotoCount: { type: number, multipleOf: 1, minimum: 0 }
+    CaseAnalysis:
+      type: object
+      required: [treatmentOptions, naturalnessScore, skinToneCombinations, materialRecommendation, fittingGuidance, longevity]
+      properties:
+        treatmentOptions:
+          type: array
+          items: { type: string }
+        naturalnessScore: { type: number, multipleOf: 1, minimum: 0, maximum: 100 }
+        skinToneCombinations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkinToneCombination"
+        materialRecommendation:
+          $ref: "#/components/schemas/MaterialRecommendation"
+        fittingGuidance:
+          type: array
+          items: { type: string }
+        longevity:
+          $ref: "#/components/schemas/LongevityForecast"
+    SkinToneCombination:
+      type: object
+      required: [name, swatches, rationale]
+      properties:
+        name: { type: string }
+        swatches: { type: array, items: { type: string }, minItems: 3, maxItems: 4 }
+        rationale: { type: string }
+    MaterialRecommendation:
+      type: object
+      required: [siliconeType, shoreHardness, tearStrength, rationale]
+      properties:
+        siliconeType: { type: string }
+        shoreHardness: { type: string }
+        tearStrength: { type: string }
+        rationale: { type: string }
+    LongevityForecast:
+      type: object
+      required: [estimatedMonths, nextReviewDate, rationale]
+      properties:
+        estimatedMonths: { type: number, multipleOf: 1 }
+        nextReviewDate: { type: string, format: date }
+        rationale: { type: string }
+    Dashboard:
+      type: object
+      required: [activeCases, fittingDue, reviewDue, recentActivity]
+      properties:
+        activeCases: { type: number, multipleOf: 1 }
+        fittingDue: { type: number, multipleOf: 1 }
+        reviewDue: { type: number, multipleOf: 1 }
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/Activity"
+    Activity:
+      type: object
+      required: [id, title, detail, timestamp]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        timestamp: { type: string, format: date-time }
+    ClinicianPreferences:
+      type: object
+      required: [defaultShoreHardness, defaultReviewMonths, naturalnessPriority, manufacturerLimits]
+      properties:
+        defaultShoreHardness: { type: string }
+        defaultReviewMonths: { type: number, multipleOf: 1 }
+        naturalnessPriority: { type: string }
+        manufacturerLimits:
+          type: object
+          required: [shoreRange, reviewRange]
+          properties:
+            shoreRange: { type: string }
+            reviewRange: { type: string }
+    PreferencesInput:
+      type: object
+      required: [defaultShoreHardness, defaultReviewMonths, naturalnessPriority]
+      properties:
+        defaultShoreHardness: { type: string }
+        defaultReviewMonths: { type: number, multipleOf: 1, minimum: 3, maximum: 18 }
+        naturalnessPriority: { type: string }

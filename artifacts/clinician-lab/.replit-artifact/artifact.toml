@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Clinician Lab Platform"
+description = "A clinician-facing workspace for planning and documenting external prosthetic cases, including structured intake, image-based reference analysis, material guidance, fitting feedback, personalized presets, and care follow-up forecasting."
+version = "1.0.0"
+id = "artifacts/clinician-lab"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22989
+
+[services.development]
+run = "pnpm --filter @workspace/clinician-lab run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/clinician-lab", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/clinician-lab/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22989"
+BASE_PATH = "/"

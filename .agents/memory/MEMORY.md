@@ -1,0 +1,1 @@
+- [Clinical safety boundary](clinical-safety-boundary.md) — Keep all clinical and visual planning output as clinician-reviewed decision support.

@@ -1,6 +1,6 @@
-# [Project name]
+# Clinician Lab Platform
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A clinician-facing decision-support workspace for structured external-prosthetic case planning, fitting documentation, and follow-up forecasting.
 
 ## Run & Operate
 
@@ -22,15 +22,22 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/clinician-lab/` — the React case workspace and clinician-facing interface
+- `artifacts/api-server/src/routes/clinical.ts` — clinical case, analysis, dashboard, and preset API endpoints
+- `lib/api-spec/openapi.yaml` — source-of-truth API contract and generated client inputs
+- `lib/db/src/schema/clinical.ts` — persistent case and clinician preference schema
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Guidance is deliberately framed as clinical decision support rather than automated diagnosis or treatment authorization; clinicians remain responsible for review and approval.
+- Starter cases are seeded idempotently through the API so a new workspace has useful example data without a separate seed command.
+- Image selection currently stays browser-local for preview; persistent clinical image storage and true image/model generation must be designed with explicit consent, retention, and validation controls.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Structured assessment intake captures case characteristics, treatment context, and retention information.
+- Case workspaces provide generic treatment guidance, naturalness and skin-tone suggestions, silicone material guidance, fitting prompts, and longevity forecasts.
+- Clinician presets persist review cadence, material defaults, and naturalness preferences within manufacturer guardrails.
 
 ## User preferences
 
