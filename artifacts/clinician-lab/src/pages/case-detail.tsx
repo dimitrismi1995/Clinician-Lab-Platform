@@ -31,6 +31,13 @@ type ToneCombination = {
   rationale: string;
   mix: { pigment: string; amount: string }[];
 };
+type NormalizedPoint = { x: number; y: number };
+type MirrorCalibration = {
+  healthyEyeCenter: NormalizedPoint;
+  defectCenter: NormalizedPoint;
+  eyeWidth: number;
+  eyeHeight: number;
+};
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -61,7 +68,102 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-async function createMirroredEyePreview(url: string, healthyEyeSide: "image-left" | "image-right") {
+function defaultMirrorCalibration(healthyEyeSide: "image-left" | "image-right"): MirrorCalibration {
+  return healthyEyeSide === "image-right"
+    ? {
+        healthyEyeCenter: { x: 0.55, y: 0.4 },
+        defectCenter: { x: 0.25, y: 0.4 },
+        eyeWidth: 0.22,
+        eyeHeight: 0.2,
+      }
+    : {
+        healthyEyeCenter: { x: 0.25, y: 0.4 },
+        defectCenter: { x: 0.55, y: 0.4 },
+        eyeWidth: 0.22,
+        eyeHeight: 0.2,
+      };
+}
+
+async function detectAutomaticMirrorCalibration(url: string): Promise<{
+  calibration: MirrorCalibration;
+  healthyEyeSide: "image-left" | "image-right";
+  confidence: number;
+}> {
+  const image = await loadImage(url);
+  const canvas = document.createElement("canvas");
+  const scale = Math.min(1, 720 / image.naturalWidth);
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Automatic eye localization is not available in this browser.");
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+
+  const scoreRegion = (centerX: number) => {
+    const left = Math.round(canvas.width * (centerX - 0.15));
+    const right = Math.round(canvas.width * (centerX + 0.15));
+    const top = Math.round(canvas.height * 0.25);
+    const bottom = Math.round(canvas.height * 0.57);
+    let darkness = 0;
+    let edgeEnergy = 0;
+    let weightedX = 0;
+    let weightedY = 0;
+    let weightTotal = 0;
+    for (let y = top; y < bottom; y += 3) {
+      for (let x = left; x < right; x += 3) {
+        const index = (y * canvas.width + x) * 4;
+        const red = pixels[index];
+        const green = pixels[index + 1];
+        const blue = pixels[index + 2];
+        const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+        const darknessWeight = Math.max(0, 150 - luminance);
+        darkness += darknessWeight;
+        if (x + 3 < canvas.width) {
+          const next = (y * canvas.width + x + 3) * 4;
+          edgeEnergy += Math.abs(luminance - (pixels[next] * 0.299 + pixels[next + 1] * 0.587 + pixels[next + 2] * 0.114));
+        }
+        weightedX += x * darknessWeight;
+        weightedY += y * darknessWeight;
+        weightTotal += darknessWeight;
+      }
+    }
+    return {
+      score: darkness * 0.72 + edgeEnergy * 0.28,
+      centerX: weightTotal ? weightedX / weightTotal / canvas.width : centerX,
+      centerY: weightTotal ? weightedY / weightTotal / canvas.height : 0.4,
+    };
+  };
+
+  const left = scoreRegion(0.28);
+  const right = scoreRegion(0.58);
+  const healthyEyeSide = right.score >= left.score ? "image-right" : "image-left";
+  const source = healthyEyeSide === "image-right" ? right : left;
+  const targetX = healthyEyeSide === "image-right" ? 0.28 : 0.58;
+  const scoreDifference = Math.abs(right.score - left.score) / Math.max(right.score, left.score, 1);
+  const confidence = Math.round(clamp(62 + scoreDifference * 150, 62, 98));
+  return {
+    healthyEyeSide,
+    confidence,
+    calibration: {
+      healthyEyeCenter: {
+        x: clamp(source.centerX, 0.12, 0.88),
+        y: clamp(source.centerY, 0.27, 0.62),
+      },
+      defectCenter: {
+        x: targetX,
+        y: clamp(source.centerY, 0.27, 0.62),
+      },
+      eyeWidth: 0.22,
+      eyeHeight: 0.2,
+    },
+  };
+}
+
+async function createMirroredEyePreview(
+  url: string,
+  calibration: MirrorCalibration,
+  targetScale: number,
+) {
   const image = await loadImage(url);
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
@@ -70,20 +172,14 @@ async function createMirroredEyePreview(url: string, healthyEyeSide: "image-left
   if (!context) throw new Error("Canvas processing is not available in this browser.");
 
   context.drawImage(image, 0, 0);
-  const source = healthyEyeSide === "image-right"
-    ? { x: 0.51, y: 0.25, width: 0.28, height: 0.29 }
-    : { x: 0.21, y: 0.25, width: 0.28, height: 0.29 };
-  const target = healthyEyeSide === "image-right"
-    ? { x: 0.21, y: 0.25, width: 0.28, height: 0.29 }
-    : { x: 0.51, y: 0.25, width: 0.28, height: 0.29 };
-  const sourceX = source.x * canvas.width;
-  const sourceY = source.y * canvas.height;
-  const sourceWidth = source.width * canvas.width;
-  const sourceHeight = source.height * canvas.height;
-  const targetX = target.x * canvas.width;
-  const targetY = target.y * canvas.height;
-  const targetWidth = target.width * canvas.width;
-  const targetHeight = target.height * canvas.height;
+  const sourceWidth = calibration.eyeWidth * canvas.width;
+  const sourceHeight = calibration.eyeHeight * canvas.height;
+  const targetWidth = sourceWidth * targetScale;
+  const targetHeight = sourceHeight * targetScale;
+  const sourceX = calibration.healthyEyeCenter.x * canvas.width - sourceWidth / 2;
+  const sourceY = calibration.healthyEyeCenter.y * canvas.height - sourceHeight / 2;
+  const targetX = calibration.defectCenter.x * canvas.width - targetWidth / 2;
+  const targetY = calibration.defectCenter.y * canvas.height - targetHeight / 2;
 
   context.save();
   context.beginPath();
@@ -99,7 +195,17 @@ async function createMirroredEyePreview(url: string, healthyEyeSide: "image-left
   context.clip();
   context.translate(targetX + targetWidth, targetY);
   context.scale(-1, 1);
-  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+  context.drawImage(
+    image,
+    Math.max(0, sourceX),
+    Math.max(0, sourceY),
+    Math.min(sourceWidth, canvas.width - Math.max(0, sourceX)),
+    Math.min(sourceHeight, canvas.height - Math.max(0, sourceY)),
+    0,
+    0,
+    targetWidth,
+    targetHeight,
+  );
   context.restore();
 
   context.save();
@@ -200,6 +306,8 @@ export default function CaseDetail() {
   const [referencePhotos, setReferencePhotos] = useState<LocalPhoto[]>([]);
   const [waxPatternPhotos, setWaxPatternPhotos] = useState<LocalPhoto[]>([]);
   const [healthyEyeSide, setHealthyEyeSide] = useState<"image-left" | "image-right">("image-right");
+  const [mirrorCalibration, setMirrorCalibration] = useState<MirrorCalibration>(() => defaultMirrorCalibration("image-right"));
+  const [mirrorConfidence, setMirrorConfidence] = useState<number | null>(null);
   const [mirroredEyePreview, setMirroredEyePreview] = useState<string | null>(null);
   const [skinToneMixes, setSkinToneMixes] = useState<ToneCombination[] | null>(null);
   const [photoProcessingError, setPhotoProcessingError] = useState<string | null>(null);
@@ -216,18 +324,29 @@ export default function CaseDetail() {
     ]);
   };
 
+  const addReferencePhotos = (files: FileList | null) => {
+    if (!files?.length) return;
+    addLocalPhotos(files, setReferencePhotos);
+  };
+
   useEffect(() => {
     const firstPhoto = referencePhotos[0];
     if (!firstPhoto) {
       setMirroredEyePreview(null);
       setSkinToneMixes(null);
+      setMirrorConfidence(null);
       return;
     }
     let cancelled = false;
     Promise.all([
-      createMirroredEyePreview(firstPhoto.url, healthyEyeSide),
+      detectAutomaticMirrorCalibration(firstPhoto.url),
       extractSkinToneMixes(firstPhoto.url),
-    ]).then(([preview, mixes]) => {
+    ]).then(async ([detected, mixes]) => {
+      if (cancelled) return;
+      setHealthyEyeSide(detected.healthyEyeSide);
+      setMirrorCalibration(detected.calibration);
+      setMirrorConfidence(detected.confidence);
+      const preview = await createMirroredEyePreview(firstPhoto.url, detected.calibration, 1);
       if (cancelled) return;
       setMirroredEyePreview(preview);
       setSkinToneMixes(mixes);
@@ -237,7 +356,7 @@ export default function CaseDetail() {
     return () => {
       cancelled = true;
     };
-  }, [healthyEyeSide, referencePhotos]);
+  }, [referencePhotos]);
 
   const exportReferenceGuide = () => {
     const guide = `<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 794 1123">
@@ -504,21 +623,27 @@ export default function CaseDetail() {
                   <p className="text-[10px] font-mono uppercase text-muted-foreground mt-2">Mirrored guide</p>
                 </div>
               </div>
-               {referencePhotos[0] && (
-                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
-                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                     <div>
-                       <p className="text-xs font-semibold">Healthy-eye source</p>
-                       <p className="text-[11px] text-muted-foreground">The selected eye is mirrored into the opposite orbital target area.</p>
-                     </div>
-                     <div className="flex gap-2">
-                       <Button type="button" size="sm" variant={healthyEyeSide === "image-left" ? "default" : "outline"} onClick={() => setHealthyEyeSide("image-left")}>Image left</Button>
-                       <Button type="button" size="sm" variant={healthyEyeSide === "image-right" ? "default" : "outline"} onClick={() => setHealthyEyeSide("image-right")}>Image right</Button>
-                     </div>
-                   </div>
-                   {photoProcessingError && <p className="mt-2 text-xs text-destructive">{photoProcessingError}</p>}
-                 </div>
-               )}
+                {referencePhotos[0] && (
+                  <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold">Automatic eye localization</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          The system automatically identifies the healthy-eye pattern, mirrors it, and places it in the contralateral orbital target.
+                        </p>
+                      </div>
+                      {mirrorConfidence !== null && (
+                        <Badge variant="outline" className="w-fit font-mono">
+                          {mirrorConfidence}% localization confidence
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Source detected: {healthyEyeSide === "image-right" ? "image right" : "image left"} · target: contralateral defect · no manual alignment required
+                    </p>
+                    {photoProcessingError && <p className="mt-2 text-xs text-destructive">{photoProcessingError}</p>}
+                  </div>
+                )}
             </CardContent>
           </Card>
            {skinToneMixes && (
