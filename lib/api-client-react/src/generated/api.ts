@@ -433,6 +433,53 @@ export const useUpdateCase = <TError = ErrorType<unknown>,
       return useMutation(getUpdateCaseMutationOptions(options));
     }
 
+export const getDeleteCaseUrl = (caseId: string,) => {
+  return `/api/cases/${caseId}`
+}
+
+/**
+ * @summary Delete a clinical case
+ */
+export const deleteCase = async (caseId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+  return customFetch<void>(getDeleteCaseUrl(caseId), {
+    ...options,
+    method: 'DELETE'
+  });
+}
+
+export const getDeleteCaseMutationOptions = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCase>>, TError,{caseId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCase>>, TError,{caseId: string}, TContext> => {
+  const mutationKey = ['deleteCase'];
+  const {mutation: mutationOptions, request: requestOptions} = options ?
+    options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+    options :
+    {...options, mutation: {...options.mutation, mutationKey}} :
+    {mutation: { mutationKey, }, request: undefined};
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCase>>, {caseId: string}> = (props) => {
+    const {caseId} = props ?? {};
+    return deleteCase(caseId, requestOptions)
+  }
+  return { mutationFn, ...mutationOptions }
+}
+
+export type DeleteCaseMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCase>>>
+export type DeleteCaseMutationError = ErrorType<NotFoundResponse>
+
+/**
+ * @summary Delete a clinical case
+ */
+export const useDeleteCase = <TError = ErrorType<NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCase>>, TError,{caseId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationResult<
+    Awaited<ReturnType<typeof deleteCase>>,
+    TError,
+    {caseId: string},
+    TContext
+> => {
+  return useMutation(getDeleteCaseMutationOptions(options));
+}
+
 export const getAnalyzeCaseUrl = (caseId: string,) => {
 
 

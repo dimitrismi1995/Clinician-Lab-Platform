@@ -100,10 +100,10 @@ async function detectAutomaticMirrorCalibration(url: string): Promise<{
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
 
   const scoreRegion = (centerX: number) => {
-    const left = Math.round(canvas.width * (centerX - 0.15));
-    const right = Math.round(canvas.width * (centerX + 0.15));
-    const top = Math.round(canvas.height * 0.25);
-    const bottom = Math.round(canvas.height * 0.57);
+    const left = Math.round(canvas.width * (centerX - 0.14));
+    const right = Math.round(canvas.width * (centerX + 0.14));
+    const top = Math.round(canvas.height * 0.42);
+    const bottom = Math.round(canvas.height * 0.76);
     let darkness = 0;
     let edgeEnergy = 0;
     let weightedX = 0;
@@ -135,10 +135,10 @@ async function detectAutomaticMirrorCalibration(url: string): Promise<{
   };
 
   const left = scoreRegion(0.28);
-  const right = scoreRegion(0.58);
+  const right = scoreRegion(0.72);
   const healthyEyeSide = right.score >= left.score ? "image-right" : "image-left";
   const source = healthyEyeSide === "image-right" ? right : left;
-  const targetX = healthyEyeSide === "image-right" ? 0.28 : 0.58;
+  const targetX = clamp(1 - source.centerX, 0.12, 0.88);
   const scoreDifference = Math.abs(right.score - left.score) / Math.max(right.score, left.score, 1);
   const confidence = Math.round(clamp(62 + scoreDifference * 150, 62, 98));
   return {
@@ -147,14 +147,14 @@ async function detectAutomaticMirrorCalibration(url: string): Promise<{
     calibration: {
       healthyEyeCenter: {
         x: clamp(source.centerX, 0.12, 0.88),
-        y: clamp(source.centerY, 0.27, 0.62),
+        y: clamp(source.centerY, 0.36, 0.78),
       },
       defectCenter: {
         x: targetX,
-        y: clamp(source.centerY, 0.27, 0.62),
+        y: clamp(source.centerY, 0.36, 0.78),
       },
-      eyeWidth: 0.22,
-      eyeHeight: 0.2,
+      eyeWidth: 0.25,
+      eyeHeight: 0.28,
     },
   };
 }
@@ -181,21 +181,15 @@ async function createMirroredEyePreview(
   const targetX = calibration.defectCenter.x * canvas.width - targetWidth / 2;
   const targetY = calibration.defectCenter.y * canvas.height - targetHeight / 2;
 
-  context.save();
-  context.beginPath();
-  context.ellipse(
-    targetX + targetWidth / 2,
-    targetY + targetHeight / 2,
-    targetWidth / 2,
-    targetHeight / 2,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.clip();
-  context.translate(targetX + targetWidth, targetY);
-  context.scale(-1, 1);
-  context.drawImage(
+  const patch = document.createElement("canvas");
+  patch.width = Math.ceil(targetWidth);
+  patch.height = Math.ceil(targetHeight);
+  const patchContext = patch.getContext("2d");
+  if (!patchContext) throw new Error("Patch compositing is not available in this browser.");
+  patchContext.save();
+  patchContext.translate(targetWidth, 0);
+  patchContext.scale(-1, 1);
+  patchContext.drawImage(
     image,
     Math.max(0, sourceX),
     Math.max(0, sourceY),
@@ -206,16 +200,22 @@ async function createMirroredEyePreview(
     targetWidth,
     targetHeight,
   );
-  context.restore();
-
-  context.save();
-  context.strokeStyle = "rgba(24,48,74,0.9)";
-  context.lineWidth = Math.max(2, canvas.width / 320);
-  context.setLineDash([8, 6]);
-  context.beginPath();
-  context.ellipse(targetX + targetWidth / 2, targetY + targetHeight / 2, targetWidth / 2, targetHeight / 2, 0, 0, Math.PI * 2);
-  context.stroke();
-  context.restore();
+  patchContext.restore();
+  patchContext.globalCompositeOperation = "destination-in";
+  const feather = patchContext.createRadialGradient(
+    targetWidth / 2,
+    targetHeight / 2,
+    Math.min(targetWidth, targetHeight) * 0.22,
+    targetWidth / 2,
+    targetHeight / 2,
+    Math.max(targetWidth, targetHeight) * 0.58,
+  );
+  feather.addColorStop(0, "rgba(0,0,0,1)");
+  feather.addColorStop(0.76, "rgba(0,0,0,0.98)");
+  feather.addColorStop(1, "rgba(0,0,0,0)");
+  patchContext.fillStyle = feather;
+  patchContext.fillRect(0, 0, targetWidth, targetHeight);
+  context.drawImage(patch, targetX, targetY);
   return canvas.toDataURL("image/png");
 }
 
@@ -605,7 +605,8 @@ export default function CaseDetail() {
                   <CardTitle className="text-base flex items-center gap-2"><ScanLine className="w-4 h-4 text-primary" /> Mirrored Reference Model</CardTitle>
                   <CardDescription className="text-xs mt-1">Printable planning guide derived from the current reference set; clinician verification required.</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                 <div className="flex gap-2">
+                   <Link href={`/case/${caseId}/edit`} className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">Edit Case</Link>
                   <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="w-3.5 h-3.5 mr-1.5" />Print</Button>
                   <Button variant="outline" size="sm" onClick={exportReferenceGuide}><Download className="w-3.5 h-3.5 mr-1.5" />Export SVG</Button>
                 </div>

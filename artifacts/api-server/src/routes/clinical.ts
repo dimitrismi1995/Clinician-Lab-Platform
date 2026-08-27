@@ -176,6 +176,24 @@ router.patch("/cases/:caseId", async (req, res): Promise<void> => {
   res.json(UpdateCaseResponse.parse(toCase(updated)));
 });
 
+router.delete("/cases/:caseId", async (req, res): Promise<void> => {
+  const params = GetCaseParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [deleted] = await db
+    .delete(clinicalCasesTable)
+    .where(eq(clinicalCasesTable.id, params.data.caseId))
+    .returning({ id: clinicalCasesTable.id });
+  if (!deleted) {
+    res.status(404).json({ error: "Clinical case not found" });
+    return;
+  }
+  req.log.info({ caseId: deleted.id }, "Deleted clinical case");
+  res.status(204).send();
+});
+
 router.post("/cases/:caseId/analysis", async (req, res): Promise<void> => {
   const params = AnalyzeCaseParams.safeParse(req.params);
   const body = AnalyzeCaseBody.safeParse(req.body);

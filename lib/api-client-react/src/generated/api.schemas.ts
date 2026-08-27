@@ -71,6 +71,15 @@ export const CaseUpdateStatus = {
 export interface CaseUpdate {
   /** @minLength 1 */
   label?: string;
+  /** @minimum 0 @maximum 120 */
+  patientAge?: number;
+  sex?: string;
+  anatomicalSite?: string;
+  missingBodyPart?: string;
+  race?: string;
+  retentionMethod?: string;
+  priorTreatments?: string[];
+  ethnicityContext?: string | null;
   status?: CaseUpdateStatus;
   /** @nullable */
   reviewDate?: string | null;

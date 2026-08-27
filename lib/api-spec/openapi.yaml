@@ -92,6 +92,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Case"
+    delete:
+      operationId: deleteCase
+      tags: [cases]
+      summary: Delete a clinical case
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "204":
+          description: Case deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
   /cases/{caseId}/analysis:
     post:
       operationId: analyzeCase
@@ -215,6 +226,14 @@ components:
       type: object
       properties:
         label: { type: string, minLength: 1 }
+        patientAge: { type: number, multipleOf: 1, minimum: 0, maximum: 120 }
+        sex: { type: string }
+        anatomicalSite: { type: string }
+        missingBodyPart: { type: string }
+        race: { type: string }
+        retentionMethod: { type: string }
+        priorTreatments: { type: array, items: { type: string } }
+        ethnicityContext: { type: ["string", "null"] }
         status: { type: string, enum: [intake, planning, fitting, review] }
         reviewDate: { type: ["string", "null"], format: date }
     AnalysisInput:

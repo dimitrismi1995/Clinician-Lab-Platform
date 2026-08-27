@@ -124,6 +124,14 @@ export const UpdateCaseParams = zod.object({
 
 export const UpdateCaseBody = zod.object({
   "label": zod.string().min(1).optional(),
+  "patientAge": zod.number().min(0).max(120).multipleOf(1).optional(),
+  "sex": zod.string().optional(),
+  "anatomicalSite": zod.string().optional(),
+  "missingBodyPart": zod.string().optional(),
+  "race": zod.string().optional(),
+  "retentionMethod": zod.string().optional(),
+  "priorTreatments": zod.array(zod.string()).optional(),
+  "ethnicityContext": zod.string().nullish(),
   "status": zod.enum(['intake', 'planning', 'fitting', 'review']).optional(),
   "reviewDate": zod.coerce.date().nullish()
 })
