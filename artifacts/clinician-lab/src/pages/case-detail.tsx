@@ -340,7 +340,7 @@ export default function CaseDetail() {
     let cancelled = false;
     Promise.all([
       detectAutomaticMirrorCalibration(firstPhoto.url),
-      extractSkinToneMixes(firstPhoto.url),
+      extractSkinToneMixes(referencePhotos[1]?.url ?? firstPhoto.url),
     ]).then(async ([detected, mixes]) => {
       if (cancelled) return;
       setHealthyEyeSide(detected.healthyEyeSide);

@@ -14,6 +14,7 @@ import { AppShell } from '@/components/layout/Shell';
 import Dashboard from '@/pages/dashboard';
 import CaseNew from '@/pages/case-new';
 import CaseDetail from '@/pages/case-detail';
+import CaseEdit from '@/pages/case-edit';
 import Presets from '@/pages/presets';
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/case/new" component={CaseNew} />
+          <Route path="/case/:caseId/edit" component={CaseEdit} />
           <Route path="/case/:caseId" component={CaseDetail} />
           <Route path="/presets" component={Presets} />
           <Route component={NotFound} />
