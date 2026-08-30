@@ -5,27 +5,21 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 
+// PORT and BASE_PATH are injected by the Replit artifact runtime, but a plain
+// `vite build` has no runtime port. Fall back to the values declared in
+// .replit-artifact/artifact.toml so the config always loads, and only validate
+// values that were actually provided.
+const DEFAULT_PORT = 8081;
+const DEFAULT_BASE_PATH = "/__mockup";
+
 const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
+const port = rawPort ? Number(rawPort) : DEFAULT_PORT;
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
+const basePath = process.env.BASE_PATH || DEFAULT_BASE_PATH;
 
 export default defineConfig({
   base: basePath,

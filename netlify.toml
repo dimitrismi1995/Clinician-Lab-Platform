@@ -1,0 +1,24 @@
+# Netlify build settings for the clinician-lab web artifact.
+# Committed here so the publish directory tracks the Vite `build.outDir`
+# (dist/public) rather than being configured separately in the Netlify UI.
+
+[build]
+  command = "pnpm --filter @workspace/clinician-lab... run build"
+  publish = "artifacts/clinician-lab/dist/public"
+
+# The backend (artifacts/api-server) is not deployed to Netlify, so /api/* has
+# nothing to serve. Answer it with a 404 rather than letting the SPA catch-all
+# below return index.html, which the API client would parse as response data.
+# Replace this rule when the API is deployed as Netlify Functions.
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 404
+
+# The app is a client-side-routed SPA (wouter), so deep links such as
+# /case/123 must be served index.html instead of returning a 404.
+# Mirrors the production rewrite in artifacts/clinician-lab/.replit-artifact/artifact.toml.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
